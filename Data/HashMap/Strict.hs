@@ -42,6 +42,7 @@ module Data.HashMap.Strict
     , HM.member
     , HM.lookup
     , lookupDefault
+    , lookupWithKey
     , (!)
     , insert
     , insertWith

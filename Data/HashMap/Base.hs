@@ -22,6 +22,7 @@ module Data.HashMap.Base
     , member
     , lookup
     , lookupDefault
+    , lookupWithKey
     , (!)
     , insert
     , insertWith
@@ -318,12 +319,25 @@ member k m = case lookup k m of
 -- | /O(log n)/ Return the value to which the specified key is mapped,
 -- or 'Nothing' if this map contains no mapping for the key.
 lookup :: (Eq k, Hashable k) => k -> HashMap k v -> Maybe v
-lookup k0 m0 = go h0 k0 0 m0
+lookup k m = case lookupLeaf k m of
+  Nothing      -> Nothing
+  Just (L _ v) -> Just v
+{-# INLINABLE lookup #-}
+
+-- | /O(log n)/ Return the value to which the specified key is mapped,
+--   and the key under which it is stored in the map, or 'Nothing'
+--   if this map contains no mapping for the key.
+lookupWithKey :: (Eq k, Hashable k) => k -> HashMap k v -> Maybe (k, v)
+lookupWithKey k m = (\(L k v) -> (k,v)) <$> lookupLeaf k m
+{-# INLINABLE lookupWithKey #-}
+
+lookupLeaf :: (Eq k, Hashable k) => k -> HashMap k v -> Maybe (Leaf k v)
+lookupLeaf k0 m0 = go h0 k0 0 m0
   where
     h0 = hash k0
     go !_ !_ !_ Empty = Nothing
-    go h k _ (Leaf hx (L kx x))
-        | h == hx && k == kx = Just x  -- TODO: Split test in two
+    go h k _ (Leaf hx lf@(L kx x))
+        | h == hx && k == kx = Just lf  -- TODO: Split test in two
         | otherwise          = Nothing
     go h k s (BitmapIndexed b v)
         | b .&. m == 0 = Nothing
@@ -333,7 +347,7 @@ lookup k0 m0 = go h0 k0 0 m0
     go h k _ (Collision hx v)
         | h == hx   = lookupInArray k v
         | otherwise = Nothing
-{-# INLINABLE lookup #-}
+{-# INLINABLE lookupLeaf #-}
 
 -- | /O(log n)/ Return the value to which the specified key is mapped,
 -- or the default value if this map contains no mapping for the key.
@@ -1073,14 +1087,14 @@ fromListWith f = L.foldl' (\ m (k, v) -> unsafeInsertWith f k v m) empty
 
 -- | /O(n)/ Lookup the value associated with the given key in this
 -- array.  Returns 'Nothing' if the key wasn't found.
-lookupInArray :: Eq k => k -> A.Array (Leaf k v) -> Maybe v
+lookupInArray :: Eq k => k -> A.Array (Leaf k v) -> Maybe (Leaf k v)
 lookupInArray k0 ary0 = go k0 ary0 0 (A.length ary0)
   where
     go !k !ary !i !n
         | i >= n    = Nothing
         | otherwise = case A.index ary i of
-            (L kx v)
-                | k == kx   -> Just v
+            lf@(L kx v)
+                | k == kx   -> Just lf
                 | otherwise -> go k ary (i+1) n
 {-# INLINABLE lookupInArray #-}
 

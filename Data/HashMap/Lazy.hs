@@ -42,6 +42,7 @@ module Data.HashMap.Lazy
     , member
     , HM.lookup
     , lookupDefault
+    , lookupWithKey
     , (!)
     , insert
     , insertWith
